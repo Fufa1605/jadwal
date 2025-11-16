@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jadwal Karyawan Mingguan</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<style>
+/* =======================
+   STYLE FINAL — CLEAN BLUE
+   ======================= */
+
+/* Soft row colors */
+.shift-1, .shift-2 { background:#F0F6FF; }
+.shift-3, .shift-4 { background:#F8FAFF; }
+.shift-5, .shift-6 { background:#EAF3FF; }
+
+/* Table base */
+table { border-collapse: collapse; }
+
+/* Header warna biru */
+th {
+  border:1px solid #C5D9F2;
+  background:#1E88E5;
+  color:white;
+  font-weight:600;
+  min-width:140px;
+  padding:.55rem;
+  text-align:center;
+}
+
+th.shift-time {
+  background:#E3F0FF;
+  color:#0A3D91;
+}
+
+/* Body cells */
+td {
+  border:1px solid #C5D9F2;
+  background:#F5F9FF;
+  padding:.55rem;
+  min-width:140px;
+  text-align:center;
+}
+
+td.cell { min-height:50px; }
+
+td[contenteditable=true]:focus {
+  background:white;
+  outline:2px solid rgba(30,136,229,.35);
+}
+
+/* Footer meta */
+.meta-table th {
+  background:#1E88E5;
+  color:white;
+  border:1px solid #C5D9F2;
+}
+.meta-table td {
+  background:#F5F9FF;
+  border:1px solid #C5D9F2;
+}
+
+/* Mobile scroll - Responsive untuk browser dan HP */
+.table-wrap { 
+  overflow-x: auto; 
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch; /* Smooth scroll di mobile */
+  width: 100%;
+  max-width: 100%;
+}
+
+.wide-table { 
+  min-width: 1200px; 
+  width: 100%;
+}
+
+/* Responsive untuk mobile/HP */
+@media (max-width: 768px) {
+  body {
+    padding: 8px;
+  }
+  
+  .max-w-5xl {
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -8px; /* Extend ke edge untuk scroll yang lebih baik */
+    padding: 0 8px;
+  }
+  
+  .wide-table {
+    min-width: 1200px; /* Tetap lebar untuk semua kolom, bisa di-scroll */
+  }
+  
+  #captureArea {
+    padding: 16px !important;
+  }
+  
+  /* Pastikan input di Informasi Tambahan responsive */
+  .space-y-3 .flex {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .space-y-3 .flex > div:first-child {
+    width: 100%;
+  }
+  
+  .space-y-3 .flex input {
+    width: 100%;
+  }
+  
+  /* Tombol responsive */
+  .flex.gap-3 {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .flex.gap-3 button {
+    width: 100%;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
+}
+
+/* Tablet */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .wide-table {
+    min-width: 1200px;
+  }
+}
+
+/* Toast */
+#toast {
+  position:fixed;
+  right:1rem;
+  bottom:1rem;
+  z-index:50;
+}
+
+/* Input fields untuk export yang jelas */
+#captureArea input {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  min-height: 38px;
+}
+</style>
+</head>
+<body class="bg-slate-50 p-4 font-sans">
+
+<div class="max-w-5xl mx-auto">
+
+  <h1 class="text-2xl font-bold mb-3">Jadwal Mingguan Karyawan</h1>
+
+  <!-- Periode -->
+  <div class="bg-white p-4 rounded-lg shadow mb-4">
+    <label class="text-sm font-medium">Periode Mingguan</label>
+    <input id="periodeInput" class="mt-2 w-full p-2 border rounded" placeholder="Contoh: 17 - 23 November 2025">
+  </div>
+
+  <!-- Card Capture -->
+  <div id="captureArea" class="bg-white p-6 rounded-lg shadow" style="box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+
+      <!-- Header dalam kartu -->
+      <div class="mb-4 pb-3 border-b border-slate-200">
+        <div class="text-xs text-slate-400 uppercase tracking-wide mb-1">Periode</div>
+        <div id="periodeLabel" class="text-xl font-bold text-slate-800">-</div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap mb-4">
+        <table class="wide-table bg-white">
+          <thead>
+            <tr>
+              <th class="shift-time">Masuk</th>
+              <th class="shift-time">Keluar</th>
+              <th class="shift-time">Jam</th>
+              <th>Senin</th>
+              <th>Selasa</th>
+              <th>Rabu</th>
+              <th>Kamis</th>
+              <th>Jumat</th>
+              <th>Sabtu</th>
+              <th>Minggu</th>
+            </tr>
+          </thead>
+          <tbody id="jadwalBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Footer Meta - List Vertikal -->
+      <div class="mt-6 pt-4 border-t border-slate-200">
+        <div class="text-xs text-slate-400 uppercase tracking-wide mb-3 font-semibold">Informasi Tambahan</div>
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <div class="w-32 font-semibold text-slate-700 text-sm">Off:</div>
+            <input id="metaOff" class="flex-1 border border-slate-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 font-semibold text-slate-700 text-sm">Bazaar:</div>
+            <input id="metaBazaar" class="flex-1 border border-slate-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 font-semibold text-slate-700 text-sm">SO:</div>
+            <input id="metaSo" class="flex-1 border border-slate-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 font-semibold text-slate-700 text-sm">Cleaning:</div>
+            <input id="metaCleaning" class="flex-1 border border-slate-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 font-semibold text-slate-700 text-sm">Sikat Lantai:</div>
+            <input id="metaSikat" class="flex-1 border border-slate-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 font-semibold text-slate-700 text-sm">Grease Trap:</div>
+            <input id="metaGrease" class="flex-1 border border-slate-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 font-semibold text-slate-700 text-sm">Note:</div>
+            <input id="metaNote" class="flex-1 border border-slate-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+      </div>
+
+  </div>
+
+  <!-- Actions -->
+  <div class="flex gap-3 mt-4">
+    <button id="clearBtn" class="px-4 py-2 border rounded">Kosongkan</button>
+    <button id="downloadBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Download PNG</button>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* SHIFTS */
+// Fungsi untuk menghitung jam dari waktu masuk dan keluar
+function calculateHours(masuk, keluar) {
+  const [masukHour, masukMin] = masuk.split('.').map(Number);
+  const [keluarHour, keluarMin] = keluar.split('.').map(Number);
+  
+  const masukTotal = masukHour * 60 + masukMin;
+  const keluarTotal = keluarHour * 60 + keluarMin;
+  
+  let diff = keluarTotal - masukTotal;
+  if (diff < 0) diff += 24 * 60; // Handle overnight shift
+  
+  const hours = Math.floor(diff / 60);
+  return hours;
+}
+
+// Inisialisasi shifts dengan format baru (jam dihitung otomatis)
+let shifts = [
+  { masuk: "08.00", keluar: "16.00", jam: calculateHours("08.00", "16.00") },
+  { masuk: "09.00", keluar: "17.00", jam: calculateHours("09.00", "17.00") },
+  { masuk: "10.00", keluar: "18.00", jam: calculateHours("10.00", "18.00") },
+  { masuk: "11.00", keluar: "19.00", jam: calculateHours("11.00", "19.00") },
+  { masuk: "12.00", keluar: "20.00", jam: calculateHours("12.00", "20.00") },
+  { masuk: "13.00", keluar: "21.00", jam: calculateHours("13.00", "21.00") },
+  { masuk: "14.00", keluar: "22.00", jam: calculateHours("14.00", "22.00") }
+];
+
+let grid = Array(shifts.length).fill().map(()=> Array(7).fill(""));
+
+// Fungsi untuk mendapatkan class shift dengan rotasi warna (template fixed)
+function getShiftClass(index) {
+  const pattern = (index % 6) + 1; // Rotasi 1-6 untuk warna
+  return "shift-" + pattern;
+}
+
+function buildTable(){
+  const tbody = document.getElementById("jadwalBody");
+  tbody.innerHTML = "";
+
+  shifts.forEach((shift, r)=>{
+    const tr = document.createElement("tr");
+    tr.className = getShiftClass(r); // Gunakan fungsi untuk class yang fixed
+
+    // Kolom Masuk
+    const tdMasuk = document.createElement("td");
+    tdMasuk.className = "shift-time font-semibold";
+    tdMasuk.textContent = shift.masuk;
+    tr.appendChild(tdMasuk);
+
+    // Kolom Keluar
+    const tdKeluar = document.createElement("td");
+    tdKeluar.className = "shift-time font-semibold";
+    tdKeluar.textContent = shift.keluar;
+    tr.appendChild(tdKeluar);
+
+    // Kolom Jam
+    const tdJam = document.createElement("td");
+    tdJam.className = "shift-time font-semibold";
+    tdJam.textContent = shift.jam + " jam";
+    tr.appendChild(tdJam);
+
+    // nama per hari (7 kolom)
+    for(let c=0;c<7;c++){
+      const td = document.createElement("td");
+      td.className = "cell";
+      td.setAttribute("contenteditable","true");
+      td.textContent = grid[r][c];
+
+      td.addEventListener("blur", ()=> {
+        grid[r][c] = td.textContent.trim();
+        // Update field Off jika ada "-"
+        updateOffField();
+      });
+
+      td.addEventListener("keydown", (e)=>{
+        if(e.key === "Enter"){ e.preventDefault(); td.blur(); }
+      });
+      
+      // Update saat input berubah (real-time)
+      td.addEventListener("input", ()=> {
+        updateOffField();
+      });
+
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  });
+}
+
+buildTable();
+
+/* Fungsi untuk update field Off berdasarkan "-" di tabel */
+function updateOffField() {
+  const tbody = document.getElementById("jadwalBody");
+  const rows = tbody.querySelectorAll("tr");
+  const offList = [];
+  
+  // Nama hari
+  const hariNames = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+  
+  rows.forEach((row, rowIndex) => {
+    // Ambil shift time dari kolom Masuk, Keluar, dan Jam
+    const shiftCells = row.querySelectorAll("td.shift-time");
+    const shiftMasuk = shiftCells[0]?.textContent || "";
+    const shiftKeluar = shiftCells[1]?.textContent || "";
+    
+    // Iterasi kolom hari (td.cell adalah kolom setelah Masuk, Keluar, Jam)
+    const cells = row.querySelectorAll("td.cell");
+    cells.forEach((cell, colIndex) => {
+      const cellValue = cell.textContent.trim();
+      
+      // Jika cell berisi "-", tambahkan ke list Off
+      if (cellValue === "-") {
+        const hari = hariNames[colIndex] || `Hari ${colIndex + 1}`;
+        // Format: "08.00-16.00 (Senin)" untuk lebih jelas
+        let nama = "";
+        if (shiftMasuk && shiftKeluar) {
+          nama = `${shiftMasuk}-${shiftKeluar} (${hari})`;
+        } else if (shiftMasuk) {
+          nama = `${shiftMasuk} (${hari})`;
+        } else {
+          nama = `Shift ${rowIndex + 1} (${hari})`;
+        }
+        offList.push(nama);
+      }
+    });
+  });
+  
+  // Update field Off
+  const offInput = document.getElementById("metaOff");
+  if (offInput) {
+    if (offList.length > 0) {
+      offInput.value = offList.join(", ");
+    } else {
+      // Jika tidak ada "-", kosongkan field Off
+      offInput.value = "";
+    }
+  }
+}
+
+/* Tambah Shift Baru */
+function addNewShift(){
+  const masuk = prompt("Masukkan waktu masuk (contoh: 14.00):");
+  if(!masuk) return;
+  
+  const keluar = prompt("Masukkan waktu keluar (contoh: 22.00):");
+  if(!keluar) return;
+  
+  // Validasi format waktu sederhana
+  const timePattern = /^\d{2}\.\d{2}$/;
+  if(!timePattern.test(masuk) || !timePattern.test(keluar)){
+    alert("Format waktu tidak valid! Gunakan format HH.MM (contoh: 14.00)");
+    return;
+  }
+  
+  // Hitung jam otomatis
+  const jam = calculateHours(masuk, keluar);
+  
+  // Tambahkan shift baru dengan format object
+  const newShift = { masuk, keluar, jam };
+  shifts.push(newShift);
+  
+  // Tambahkan row baru ke grid
+  grid.push(Array(7).fill(""));
+  
+  // Rebuild table
+  buildTable();
+  showToast(`Shift ${masuk} - ${keluar} (${jam} jam) berhasil ditambahkan`);
+}
+
+/* Periode */
+document.getElementById("periodeInput").addEventListener("input", e=>{
+  document.getElementById("periodeLabel").textContent = e.target.value || "-";
+});
+
+/* Clear */
+document.getElementById("clearBtn").addEventListener("click", ()=>{
+  if(!confirm("Kosongkan semua jadwal?")) return;
+  grid = Array(shifts.length).fill().map(()=> Array(7).fill(""));
+  buildTable();
+  updateOffField(); // Update field Off setelah clear
+  showToast("Semua jadwal dikosongkan");
+});
+
+/* Download */
+document.getElementById("downloadBtn").addEventListener("click", async ()=>{
+  const node = document.getElementById("captureArea");
+  const originalWidth = node.style.width;
+  const originalPadding = node.style.padding;
+  const originalPaddingBottom = node.style.paddingBottom;
+  const originalOverflow = node.style.overflow;
+  const originalMinHeight = node.style.minHeight;
+  const originalMaxHeight = node.style.maxHeight;
+  
+  // Scroll ke posisi node untuk memastikan terlihat
+  node.scrollIntoView({ behavior: 'instant', block: 'start' });
+  
+  // Tunggu sebentar untuk scroll selesai
+  await new Promise(resolve => setTimeout(resolve, 150));
+  
+  // Set width untuk hasil yang lebih lebar dan profesional (cukup untuk semua kolom sampai Minggu)
+  node.style.width = "1800px"; // Lebih lebar untuk menampung 10 kolom
+  node.style.padding = "32px";
+  node.style.paddingBottom = "150px"; // Extra padding bottom sangat besar untuk Informasi Tambahan
+  node.style.boxSizing = "border-box";
+  node.style.overflow = "visible";
+  node.style.minHeight = "auto";
+  node.style.maxHeight = "none";
+  node.style.height = "auto";
+  
+  // Tingkatkan ukuran font untuk semua teks
+  const allTextElements = node.querySelectorAll('*');
+  allTextElements.forEach(el => {
+    const computedStyle = window.getComputedStyle(el);
+    const currentFontSize = parseInt(computedStyle.fontSize);
+    if (currentFontSize && currentFontSize < 16) {
+      el.style.fontSize = Math.max(currentFontSize * 1.2, 16) + "px";
+    }
+  });
+  
+  // Pastikan tabel memiliki lebar yang cukup untuk semua kolom (Masuk sampai Minggu - 10 kolom)
+  const tables = node.querySelectorAll('table');
+  tables.forEach(table => {
+    table.style.minWidth = "1600px"; // Lebih lebar untuk 10 kolom
+    table.style.width = "100%";
+    table.style.maxWidth = "none";
+    table.style.tableLayout = "auto";
+    // Pastikan semua kolom terlihat termasuk Sabtu dan Minggu
+    const allCells = table.querySelectorAll('th, td');
+    allCells.forEach(cell => {
+      if (cell.classList.contains('shift-time')) {
+        cell.style.minWidth = "130px";
+      } else {
+        cell.style.minWidth = "150px"; // Lebih lebar untuk kolom hari
+      }
+      // Tingkatkan ukuran font
+      cell.style.fontSize = "16px";
+      cell.style.lineHeight = "1.6";
+    });
+  });
+  
+  // Pastikan table-wrap tidak memotong
+  const tableWraps = node.querySelectorAll('.table-wrap');
+  tableWraps.forEach(wrap => {
+    wrap.style.overflow = "visible";
+    wrap.style.maxWidth = "none";
+    wrap.style.width = "100%";
+  });
+  
+  // Force reflow beberapa kali untuk memastikan semua konten ter-render
+  void node.offsetHeight;
+  await new Promise(resolve => setTimeout(resolve, 100));
+  void node.offsetHeight;
+  
+  // Tunggu lebih lama untuk memastikan semua konten termasuk semua shift ter-render
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  try{
+    // Hitung height dengan mengukur semua elemen secara manual termasuk Informasi Tambahan
+    const computedStyle = window.getComputedStyle(node);
+    const paddingTop = parseInt(computedStyle.paddingTop) || 32;
+    const paddingBottom = parseInt(computedStyle.paddingBottom) || 150;
+    
+    // Dapatkan tinggi sebenarnya dari semua konten termasuk semua input di Informasi Tambahan
+    let totalContentHeight = 0;
+    const children = Array.from(node.children);
+    children.forEach(child => {
+      const rect = child.getBoundingClientRect();
+      const style = window.getComputedStyle(child);
+      const marginTop = parseInt(style.marginTop) || 0;
+      const marginBottom = parseInt(style.marginBottom) || 0;
+      totalContentHeight += rect.height + marginTop + marginBottom;
+    });
+    
+    // Hitung tinggi khusus untuk bagian Informasi Tambahan (list vertikal)
+    // Cari div yang berisi "Informasi Tambahan"
+    const allDivs = node.querySelectorAll('div');
+    let infoSection = null;
+    for (let div of allDivs) {
+      if (div.textContent && div.textContent.includes('Informasi Tambahan')) {
+        infoSection = div.parentElement;
+        break;
+      }
+    }
+    
+    let infoSectionHeight = 0;
+    if (infoSection) {
+      // Tunggu sebentar untuk memastikan semua input ter-render
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const infoRect = infoSection.getBoundingClientRect();
+      const infoStyle = window.getComputedStyle(infoSection);
+      const infoMarginTop = parseInt(infoStyle.marginTop) || 0;
+      const infoMarginBottom = parseInt(infoStyle.marginBottom) || 0;
+      const infoPaddingTop = parseInt(infoStyle.paddingTop) || 0;
+      const infoPaddingBottom = parseInt(infoStyle.paddingBottom) || 0;
+      
+      // Hitung tinggi semua input di dalam Informasi Tambahan
+      const infoInputs = infoSection.querySelectorAll('input');
+      let inputsHeight = 0;
+      const spaceY = infoSection.querySelector('.space-y-3');
+      if (spaceY) {
+        const spaceYStyle = window.getComputedStyle(spaceY);
+        const spaceYGap = parseInt(spaceYStyle.gap) || 12; // space-y-3 = 12px
+        
+        infoInputs.forEach((input, index) => {
+          const inputParent = input.closest('.flex.items-center');
+          if (inputParent) {
+            const inputRect = inputParent.getBoundingClientRect();
+            inputsHeight += inputRect.height;
+            if (index < infoInputs.length - 1) {
+              inputsHeight += spaceYGap; // Tambahkan gap antar item
+            }
+          }
+        });
+      } else {
+        infoInputs.forEach(input => {
+          const inputParent = input.closest('.flex.items-center');
+          if (inputParent) {
+            const inputRect = inputParent.getBoundingClientRect();
+            const inputStyle = window.getComputedStyle(inputParent);
+            const inputMarginBottom = parseInt(inputStyle.marginBottom) || 0;
+            inputsHeight += inputRect.height + inputMarginBottom;
+          }
+        });
+      }
+      
+      // Hitung tinggi header "Informasi Tambahan"
+      const headerHeight = 20; // Approximate height untuk text-xs
+      const headerMarginBottom = 12; // mb-3
+      
+      // Total tinggi Informasi Tambahan
+      infoSectionHeight = infoRect.height + infoMarginTop + infoMarginBottom + infoPaddingTop + infoPaddingBottom;
+      
+      // Jika perhitungan manual lebih besar, gunakan itu
+      const manualHeight = headerHeight + headerMarginBottom + inputsHeight + infoPaddingTop + infoPaddingBottom + infoMarginTop + infoMarginBottom;
+      infoSectionHeight = Math.max(infoSectionHeight, manualHeight + 50); // Tambah buffer
+    }
+    
+    // Gunakan yang lebih besar antara scrollHeight, offsetHeight, atau perhitungan manual
+    const scrollHeight = node.scrollHeight;
+    const offsetHeight = node.offsetHeight;
+    const calculatedHeight = totalContentHeight + paddingTop + paddingBottom;
+    
+    // Jika infoSectionHeight sudah dihitung, pastikan tinggi mencakupnya
+    let heightWithInfo = Math.max(scrollHeight, offsetHeight, calculatedHeight);
+    if (infoSectionHeight > 0) {
+      // Pastikan tinggi mencakup Informasi Tambahan dengan buffer ekstra
+      heightWithInfo = Math.max(heightWithInfo, calculatedHeight + infoSectionHeight);
+    }
+    
+    // Ambil yang terbesar dan tambah margin ekstra sangat besar untuk memastikan tidak terpotong
+    // Tambah buffer 300px untuk memastikan semua konten termasuk Informasi Tambahan ter-capture
+    const finalHeight = Math.max(scrollHeight, offsetHeight, calculatedHeight, heightWithInfo) + 300;
+    
+    const canvas = await html2canvas(node, { 
+      scale: 3, // Kualitas lebih tinggi
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+      width: 1800, // Lebih lebar untuk semua kolom sampai Minggu
+      height: finalHeight,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: 1800, // Lebih lebar untuk semua kolom
+      windowHeight: finalHeight + 800, // Margin sangat besar untuk memastikan semua ter-capture termasuk Informasi Tambahan
+      allowTaint: false,
+      removeContainer: false,
+      onclone: (clonedDoc) => {
+        // Pastikan semua input dan konten ter-render dengan baik
+        const clonedNode = clonedDoc.getElementById('captureArea');
+        if (clonedNode) {
+          clonedNode.style.width = "1800px"; // Lebih lebar untuk semua kolom
+          clonedNode.style.overflow = "visible";
+          clonedNode.style.maxHeight = "none";
+          clonedNode.style.height = "auto";
+          clonedNode.style.paddingBottom = "150px";
+          clonedNode.style.minHeight = "auto";
+          
+          // Tingkatkan ukuran font untuk semua elemen
+          const allElements = clonedNode.querySelectorAll('*');
+          allElements.forEach(el => {
+            const computedStyle = window.getComputedStyle(el);
+            const currentFontSize = parseInt(computedStyle.fontSize);
+            if (currentFontSize && currentFontSize < 16) {
+              el.style.fontSize = Math.max(currentFontSize * 1.2, 16) + "px";
+            }
+            // Pastikan line height cukup untuk readability
+            if (el.tagName === 'TD' || el.tagName === 'TH' || el.tagName === 'DIV' || el.tagName === 'P') {
+              el.style.lineHeight = "1.6";
+            }
+          });
+        }
+        // Pastikan semua input menampilkan value-nya dengan jelas, terutama di Informasi Tambahan
+        // Ubah input menjadi div yang menampilkan value untuk memastikan text terlihat jelas
+        const inputs = clonedNode.querySelectorAll('input');
+        inputs.forEach(input => {
+          const value = input.value || '';
+          const parent = input.parentElement;
+          
+          if (parent) {
+            // Buat div replacement yang menampilkan value dengan jelas
+            const valueDiv = clonedDoc.createElement('div');
+            valueDiv.textContent = value;
+            valueDiv.style.backgroundColor = "#ffffff";
+            valueDiv.style.border = "1px solid #cbd5e1";
+            valueDiv.style.borderRadius = "4px";
+            valueDiv.style.padding = "8px";
+            valueDiv.style.minHeight = "38px";
+            valueDiv.style.flex = "1 1 auto"; // Untuk parent dengan flex
+            valueDiv.style.width = "100%";
+            valueDiv.style.boxSizing = "border-box";
+            valueDiv.style.overflow = "visible";
+            valueDiv.style.wordWrap = "break-word";
+            valueDiv.style.whiteSpace = "pre-wrap";
+            valueDiv.style.color = "#000000";
+            valueDiv.style.fontSize = "16px"; // Font lebih besar
+            valueDiv.style.lineHeight = "1.6"; // Line height lebih besar
+            valueDiv.style.display = "block";
+            valueDiv.style.visibility = "visible";
+            valueDiv.style.maxHeight = "none";
+            valueDiv.style.height = "auto";
+            
+            // Copy semua class dari input, terutama flex-1
+            valueDiv.className = input.className;
+            if (input.classList.contains('flex-1')) {
+              valueDiv.style.flex = "1 1 auto";
+            }
+            
+            // Ganti input dengan div
+            parent.replaceChild(valueDiv, input);
+          } else {
+            // Fallback: set style input jika tidak ada parent
+            input.style.backgroundColor = "#ffffff";
+            input.style.border = "1px solid #cbd5e1";
+            input.style.visibility = "visible";
+            input.style.display = "block";
+            input.style.width = "100%";
+            input.style.minHeight = "38px";
+            input.style.height = "auto";
+            input.style.overflow = "visible";
+            input.style.textOverflow = "clip";
+            input.style.whiteSpace = "normal";
+            input.style.wordWrap = "break-word";
+            input.style.padding = "8px";
+            input.style.boxSizing = "border-box";
+            if (value) {
+              input.setAttribute('value', value);
+            }
+          }
+        });
+        // Pastikan semua tabel dan konten terlihat lengkap dari Masuk sampai Minggu (10 kolom)
+        const tables = clonedNode.querySelectorAll('table');
+        tables.forEach(table => {
+          table.style.visibility = "visible";
+          table.style.display = "table";
+          table.style.width = "100%";
+          table.style.tableLayout = "auto";
+          table.style.borderCollapse = "collapse";
+          table.style.maxWidth = "none";
+          table.style.minWidth = "1600px"; // Lebih lebar untuk 10 kolom (Masuk, Keluar, Jam, Senin-Minggu)
+          
+          // Pastikan semua kolom terlihat termasuk Sabtu dan Minggu
+          const allCells = table.querySelectorAll('th, td');
+          allCells.forEach(cell => {
+            cell.style.visibility = "visible";
+            cell.style.display = "table-cell";
+            cell.style.overflow = "visible";
+            cell.style.textOverflow = "clip";
+            cell.style.whiteSpace = "normal";
+            cell.style.wordWrap = "break-word";
+            // Tingkatkan ukuran font untuk semua cell
+            cell.style.fontSize = "16px";
+            cell.style.lineHeight = "1.6";
+            // Pastikan lebar kolom cukup
+            if (cell.classList.contains('shift-time')) {
+              cell.style.minWidth = "130px";
+            } else {
+              cell.style.minWidth = "150px"; // Lebih lebar untuk kolom hari termasuk Sabtu dan Minggu
+            }
+          });
+        });
+        
+        // Pastikan table-wrap tidak memotong kolom
+        const tableWraps = clonedNode.querySelectorAll('.table-wrap');
+        tableWraps.forEach(wrap => {
+          wrap.style.overflow = "visible";
+          wrap.style.maxWidth = "none";
+          wrap.style.width = "100%";
+        });
+        
+        // Pastikan wide-table terlihat lengkap sampai Minggu
+        const wideTables = clonedNode.querySelectorAll('.wide-table');
+        wideTables.forEach(table => {
+          table.style.minWidth = "1600px"; // Lebih lebar untuk semua kolom
+          table.style.width = "100%";
+          table.style.maxWidth = "none";
+        });
+        
+        // Tingkatkan font untuk input fields di Informasi Tambahan
+        const infoInputs = clonedNode.querySelectorAll('#metaOff, #metaBazaar, #metaSo, #metaCleaning, #metaSikat, #metaGrease, #metaNote');
+        infoInputs.forEach(input => {
+          input.style.fontSize = "16px";
+          input.style.lineHeight = "1.6";
+        });
+        // Pastikan bagian Informasi Tambahan terlihat lengkap
+        const allClonedDivs = clonedNode.querySelectorAll('div');
+        let infoSectionCloned = null;
+        for (let div of allClonedDivs) {
+          if (div.textContent && div.textContent.includes('Informasi Tambahan')) {
+            infoSectionCloned = div.parentElement;
+            break;
+          }
+        }
+        if (infoSectionCloned) {
+          infoSectionCloned.style.visibility = "visible";
+          infoSectionCloned.style.display = "block";
+          infoSectionCloned.style.maxHeight = "none";
+          infoSectionCloned.style.overflow = "visible";
+          infoSectionCloned.style.height = "auto";
+          // Pastikan semua div di dalam Informasi Tambahan terlihat
+          const infoDivs = infoSectionCloned.querySelectorAll('.flex.items-center');
+          infoDivs.forEach(div => {
+            div.style.visibility = "visible";
+            div.style.display = "flex";
+            div.style.maxHeight = "none";
+            div.style.height = "auto";
+          });
+          // Pastikan space-y-3 container terlihat
+          const spaceYContainer = infoSectionCloned.querySelector('.space-y-3');
+          if (spaceYContainer) {
+            spaceYContainer.style.visibility = "visible";
+            spaceYContainer.style.display = "block";
+            spaceYContainer.style.maxHeight = "none";
+            spaceYContainer.style.height = "auto";
+          }
+        }
+      }
+    });
+    
+    canvas.toBlob(blob=>{
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      
+      // Nama file dengan tanggal
+      const periode = document.getElementById("periodeLabel").textContent || "jadwal";
+      const fileName = periode.replace(/[^a-zA-Z0-9\s-]/g, "").trim().replace(/\s+/g, "_") || "jadwal";
+      a.download = `${fileName}.png`;
+      
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Gambar berhasil disimpan");
+    }, "image/png", 1.0); // Kualitas maksimal
+  }catch(err){
+    console.error(err);
+    showToast("Gagal membuat gambar");
+  }
+
+  // Restore original styles
+  node.style.width = originalWidth;
+  node.style.padding = originalPadding;
+  node.style.paddingBottom = originalPaddingBottom;
+  node.style.overflow = originalOverflow;
+  node.style.minHeight = originalMinHeight;
+  node.style.maxHeight = originalMaxHeight;
+  node.style.height = "";
+});
+
+/* Toast */
+function showToast(msg){
+  const box = document.getElementById("toast");
+  const t = document.createElement("div");
+  t.className = "bg-white border shadow px-3 py-2 mb-2 rounded text-sm";
+  t.textContent = msg;
+  box.appendChild(t);
+  setTimeout(()=>{ t.remove(); },3000);
+}
+</script>
+
+</body>
+</html>
